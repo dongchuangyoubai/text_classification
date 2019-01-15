@@ -6,6 +6,15 @@ from nltk.stem.lancaster import LancasterStemmer
 import numpy as np
 from tqdm import *
 
+def batch_generator(inputs, targets, batch_size, seq_length):
+    n_batch = int(len(inputs)/batch_size)
+    inputs = inputs[:n_batch * batch_size]
+    targets = targets[:n_batch * batch_size]
+    while True:
+        for i in range(0, len(inputs), batch_size):
+            x = inputs[i: i + batch_size]
+            y = targets[i : i + batch_size]
+            yield x, y
 
 
 class DataLoader(object):
@@ -119,4 +128,6 @@ class DataLoader(object):
 
 if __name__ == '__main__':
     dt = DataLoader(r"D:\python project\text_classification\aclImdb", 'glove_data', 50, 'trimmed.npz')
+    for x, y in batch_generator(dt.data, dt.labels, 32, 100):
+        print(len(y))
 
