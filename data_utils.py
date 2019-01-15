@@ -3,7 +3,6 @@ import pickle
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem.lancaster import LancasterStemmer
-import copy
 import numpy as np
 from tqdm import *
 
