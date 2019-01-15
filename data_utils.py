@@ -1,10 +1,8 @@
-import numpy as np
 import os
 import pickle
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem.lancaster import LancasterStemmer
-from gensim import corpora
 
 class DataLoader(object):
     def __init__(self, input_files, pkl_file='data.pkl', max_vocab_size=5000):
@@ -17,6 +15,7 @@ class DataLoader(object):
     def load_data(self):
         if os.path.exists(self.pkl_file):
             [self.data, self.labels, self.vocab_list, self.word2int, self.int2word] = pickle.load(open(self.pkl_file, 'rb'))
+
         else:
             english_stopwords = stopwords.words('english')
             english_punctuations = [',', '.', ':', ';', '?', '(', ')', '[', ']', "/"
@@ -49,10 +48,6 @@ class DataLoader(object):
 
             count_dict = {}
             all_data = [w for l in self.data for w in l]
-            # print(len(all_data))
-            # print(all_data[:10])
-            # self.vocab = set(all_data)
-            # print(len(self.vocab))
             for i in all_data:
                 if i not in count_dict.keys():
                     count_dict[i] = 0
@@ -94,4 +89,3 @@ class DataLoader(object):
 
 if __name__ == '__main__':
     dt = DataLoader(r"D:\python project\text_classification\aclImdb")
-    # dt = DataLoader(r"D:\python project\text_classification\aclImdb")
