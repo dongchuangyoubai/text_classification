@@ -9,8 +9,17 @@ import tensorflow as tf
 import logging
 logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+import random
+
+
 
 def batch_generator(inputs, targets, batch_size, seq_length):
+    randnum = random.randint(0, 100)
+    random.seed(randnum)
+    random.shuffle(inputs)
+    random.seed(randnum)
+    random.shuffle(targets)
+
     n_batch = int(len(inputs)/batch_size)
     inputs = inputs[:n_batch * batch_size]
     targets = targets[:n_batch * batch_size]

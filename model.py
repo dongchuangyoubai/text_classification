@@ -5,8 +5,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Model(object):
-    def __init__(self, data_loader, num_classes, batch_size, seq_lengths, num_layers=1, learning_rate=0.01,
-                 hidden_size=128, dropout=0.8, embedding_size=128):
+    def __init__(self, data_loader, num_classes, batch_size, seq_lengths, num_layers=1, learning_rate=0.1,
+                 hidden_size=128, dropout=0.5, grad_clip=5):
         self.dt = data_loader
         self.num_classes = num_classes #10
         self.batch_size = batch_size
@@ -16,7 +16,7 @@ class Model(object):
         self.lr = learning_rate
         self.hidden_size = hidden_size
         self.dropout = dropout
-        self.embedding_size = embedding_size
+        self.grad_clip = grad_clip
 
         tf.reset_default_graph()
         self.build_placeholder()
@@ -28,7 +28,7 @@ class Model(object):
     def build_placeholder(self):
         with tf.name_scope('inputs'):
             self.inputs = tf.placeholder(tf.int32, [self.batch_size, self.seq_lengths], 'inputs')
-            self.targets = tf.placeholder(tf.int32, [self.batch_size], 'targets')
+            self.targets = tf.placeholder(tf.int64, [self.batch_size], 'targets')
             embeddings = tf.Variable(self.embeddings, trainable=False, name='embeddings', dtype=tf.float32)
             self.inputs_emb = tf.nn.embedding_lookup(embeddings, self.inputs, 'inputs_emb')
 
@@ -51,12 +51,11 @@ class Model(object):
             # self.lstm_output = tf.reshape(self.final_state, (-1, self.hidden_size))
 
             with tf.variable_scope('softmax'):
-                w = tf.Variable(tf.truncated_normal([self.hidden_size, self.num_classes], stddev=0.1))
+                w = tf.Variable(tf.truncated_normal([self.hidden_size, self.num_classes], mean=0, stddev=0.1))
                 b = tf.Variable(tf.zeros(self.num_classes))
             self.logits = tf.matmul(h, w) + b
-            self.prob = tf.nn.softmax(self.logits)
-            self.prob = tf.cast(tf.argmax(self.prob), tf.float32)
-            self.prob = tf.argmax(self.prob)
+            self.prob = tf.map_fn(lambda i: tf.nn.softmax(i), self.logits)
+            self.prob1 = tf.argmax(self.prob, axis=1)
 
     def build_loss(self):
         with tf.name_scope('loss'):
@@ -65,8 +64,12 @@ class Model(object):
             self.loss = tf.reduce_mean(loss)
 
     def build_optim(self):
+        # train_op = tf.train.AdamOptimizer(self.lr)
+        # self.optimizer = train_op.minimize(self.loss)
+        tvars = tf.trainable_variables()
+        grads, _ = tf.clip_by_global_norm(tf.gradients(self.loss, tvars), self.grad_clip)
         train_op = tf.train.AdamOptimizer(self.lr)
-        self.optimizer = train_op.minimize(self.loss)
+        self.optimizer = train_op.apply_gradients(zip(grads, tvars))
 
     def train(self):
         logger.info("start train")
@@ -75,6 +78,7 @@ class Model(object):
             sess.run(tf.global_variables_initializer())
             step = 0
             new_state = sess.run(self.initial_state)
+            avg_loss = 0
             for x, y in batch_generator(self.dt.data, self.dt.labels, self.batch_size, self.seq_lengths):
                 feed = {self.inputs: x,
                             self.targets: y,
@@ -82,10 +86,22 @@ class Model(object):
                 batch_loss, new_state, _ = sess.run([self.loss, self.final_state, self.optimizer],
                                                     feed_dict=feed)
                 step += 1
+                avg_loss += batch_loss
                 if step % 100 == 0:
-                    logger.info("steps: %d, batch_loss: %f"% (step, batch_loss))
+                    print("steps: %d, batch_loss: %f"% (step, avg_loss/100))
+                    avg_loss = 0
+                    correct_prediction = tf.equal(self.prob1, self.targets)
+                    accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+                    print("Accuracy:", accuracy.eval({self.inputs: x, self.targets: y}))
+                    print("targets", self.targets.eval({self.inputs: x, self.targets: y}))
+                    print("logits", self.logits.eval({self.inputs: x, self.targets: y}))
+                    print("prob", self.prob.eval({self.inputs: x, self.targets: y}))
+                    print("prob1", self.prob1.eval({self.inputs: x, self.targets: y}))
+                if step == 7810:
+                    break
+
 
 if __name__ == '__main__':
     dt = DataLoader(r"D:\python project\text_classification\aclImdb", 'glove_data', 50, 'trimmed.npz')
-    m = Model(dt, 10, 32, 200)
+    m = Model(dt, 10, 100, 200)
     m.train()
